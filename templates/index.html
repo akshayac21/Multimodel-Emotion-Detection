@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion AI Multimodal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Sentient<span class="accent">AI</span></h1>
+            <p>Text, Image, and Audio Emotion Analysis</p>
+        </header>
+
+        <main class="card">
+            <form method="POST" enctype="multipart/form-data" id="mainForm">
+                
+                <div class="tabs">
+                    <button type="button" class="tab-btn active" onclick="changeMode('text')">Text</button>
+                    <button type="button" class="tab-btn" onclick="changeMode('image')">Image</button>
+                    <button type="button" class="tab-btn" onclick="changeMode('audio')">Audio</button>
+                </div>
+
+                <select name="mode" id="mode-select" style="display: none;">
+                    <option value="text" selected>text</option>
+                    <option value="image">image</option>
+                    <option value="audio">audio</option>
+                </select>
+
+                <div class="input-section">
+                    <div id="text-input-group">
+                        <textarea name="text" placeholder="Enter text to analyze..."></textarea>
+                    </div>
+
+                    <div id="file-input-group" class="hidden">
+                        <label class="file-label">
+                            <input type="file" name="file" id="file-field">
+                            <div class="upload-design">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span id="file-name">Select Image or Audio File</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn">Analyze Emotion</button>
+            </form>
+
+            <div id="loading" class="hidden">
+                <div class="spinner"></div>
+                <p>Running Neural Inference...</p>
+            </div>
+        </main>
+
+        {% if prediction %}
+        <section class="result-card fade-in">
+            <div class="res-header">
+                <h2>Analysis Result</h2>
+                <span class="badge">{{ confidence }}</span>
+            </div>
+            <h3 class="emotion-display">{{ prediction }}</h3>
+            
+            {% if plot %}
+            <div class="plot-box">
+                <img src="{{ plot }}" alt="Emotion Distribution">
+            </div>
+            {% endif %}
+            
+            <a href="/" class="reset-link">Try another analysis</a>
+        </section>
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+</body>
+</html>
