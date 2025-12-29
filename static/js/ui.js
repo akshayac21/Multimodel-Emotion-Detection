@@ -1,33 +1,79 @@
-function changeMode(mode) {
-    // 1. Update the hidden select field for Flask
-    document.getElementById('mode-select').value = mode;
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // Elements
+    const modeSelect = document.getElementById('modeSelect');
+    const textGroup = document.getElementById('textInputParams');
+    const fileGroup = document.getElementById('fileInputParams');
+    const fileInput = document.getElementById('file');
+    const fileNameDisplay = document.getElementById('fileName');
+    const form = document.getElementById('analysisForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingOverlay = document.getElementById('loadingOverlay');
 
-    // 2. Update Tab UI
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if(btn.innerText.toLowerCase() === mode) btn.classList.add('active');
+    // 1. Handle Mode Switching
+    function updateInputVisibility() {
+        const mode = modeSelect.value;
+        
+        // Reset required attributes to prevent browser validation errors on hidden fields
+        const textArea = document.getElementById('text');
+        
+        if (mode === 'text') {
+            textGroup.classList.remove('hidden');
+            fileGroup.classList.add('hidden');
+            textArea.required = true;
+            fileInput.required = false;
+        } else {
+            // Both Image and Audio use the file input
+            textGroup.classList.add('hidden');
+            fileGroup.classList.remove('hidden');
+            textArea.required = false;
+            fileInput.required = true;
+            
+            // Update accept attribute based on mode
+            if (mode === 'image') {
+                fileInput.accept = "image/*";
+                fileNameDisplay.textContent = "Upload Facial Image (JPG, PNG)";
+            } else {
+                fileInput.accept = "audio/*";
+                fileNameDisplay.textContent = "Upload Voice Recording (WAV, MP3)";
+            }
+        }
+    }
+
+    // Initialize state
+    modeSelect.addEventListener('change', updateInputVisibility);
+    updateInputVisibility(); // Run on load
+
+    // 2. Enhance File Input UX
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            fileNameDisplay.textContent = `Selected: ${e.target.files[0].name}`;
+            fileNameDisplay.style.color = '#0F766E'; // Teal color indicating success
+            fileNameDisplay.style.fontWeight = '600';
+        }
     });
 
-    // 3. Toggle visibility
-    const textGroup = document.getElementById('text-input-group');
-    const fileGroup = document.getElementById('file-input-group');
+    // 3. Handle Form Submission & Loading
+    form.addEventListener('submit', (e) => {
+        // Basic Client-side Validation
+        const mode = modeSelect.value;
+        let isValid = true;
 
-    if (mode === 'text') {
-        textGroup.classList.remove('hidden');
-        fileGroup.classList.add('hidden');
-    } else {
-        textGroup.classList.add('hidden');
-        fileGroup.classList.remove('hidden');
-    }
-}
+        if (mode === 'text' && !document.getElementById('text').value.trim()) {
+            isValid = false;
+            alert("Please enter text for analysis.");
+        } else if (mode !== 'text' && fileInput.files.length === 0) {
+            isValid = false;
+            alert("Please select a file.");
+        }
 
-// Show filename after selection
-document.getElementById('file-field').addEventListener('change', function(e) {
-    const fileName = e.target.files[0] ? e.target.files[0].name : "Select File";
-    document.getElementById('file-name').innerText = fileName;
-});
-
-// Loading state on submit
-document.getElementById('mainForm').addEventListener('submit', function() {
-    document.getElementById('loading').classList.remove('hidden');
+        if (isValid) {
+            // Show Loader
+            loadingOverlay.classList.remove('hidden');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Analyzing...';
+        } else {
+            e.preventDefault(); // Stop submission if invalid
+        }
+    });
 });
