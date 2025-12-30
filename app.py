@@ -32,6 +32,19 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # =========================================
+# GLOBAL EMOTION SCHEMA (FINAL)
+# =========================================
+FINAL_EMOTIONS = [
+    "angry",
+    "sad",
+    "happy",
+    "neutral",
+    "surprise",
+    "fear",
+    "disgust"
+]
+
+# =========================================
 # PATHS & FOLDERS
 # =========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,7 +57,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PLOT_FOLDER, exist_ok=True)
 
 # =========================================
-# TEMP EMOTION MEMORY (PER MODALITY)
+# EMOTION HISTORY (PER MODALITY)
 # =========================================
 emotion_history = {
     "text": [],
@@ -91,7 +104,7 @@ AUDIO_MODEL_PATH = os.path.join(
     BASE_DIR, "models", "audio", "voice_emotion_cnn_bilstm.h5"
 )
 
-OBSERVED_EMOTIONS = [
+AUDIO_ORIGINAL_LABELS = [
     "neutral", "calm", "happy",
     "sad", "angry", "fearful"
 ]
@@ -108,7 +121,7 @@ app = Flask(__name__)
 # PLOT FUNCTION
 # =========================================
 def plot_probabilities(labels, probabilities):
-    plt.figure(figsize=(8, 4))
+    plt.figure(figsize=(9, 4))
     plt.bar(labels, probabilities)
     plt.ylim(0, 1)
     plt.xlabel("Emotion")
@@ -119,20 +132,51 @@ def plot_probabilities(labels, probabilities):
     plt.close()
 
 # =========================================
+# ALIGNMENT FUNCTIONS
+# =========================================
+def align_text_probabilities(raw_probs, raw_labels):
+    prob_map = dict(zip([l.lower() for l in raw_labels], raw_probs))
+    probs = np.array([prob_map.get(e, 0.0) for e in FINAL_EMOTIONS])
+    return probs / np.sum(probs)
+
+def align_image_probabilities(raw_probs, raw_labels):
+    prob_map = {
+        lbl.lower(): raw_probs[i]
+        for i, lbl in enumerate(raw_labels)
+    }
+    probs = np.array([prob_map.get(e, 0.0) for e in FINAL_EMOTIONS])
+    return probs / np.sum(probs)
+
+def align_audio_probabilities(raw_probs):
+    audio_map = dict(zip(AUDIO_ORIGINAL_LABELS, raw_probs))
+
+    final_map = {
+        "angry": audio_map.get("angry", 0.0),
+        "sad": audio_map.get("sad", 0.0),
+        "happy": audio_map.get("happy", 0.0),
+        "neutral": audio_map.get("neutral", 0.0) + audio_map.get("calm", 0.0),
+        "surprise": 0.0,
+        "fear": audio_map.get("fearful", 0.0),
+        "disgust": 0.0
+    }
+
+    probs = np.array([final_map[e] for e in FINAL_EMOTIONS])
+    return probs / np.sum(probs)
+
+# =========================================
 # MENTAL HEALTH CALCULATION
 # =========================================
 def calculate_mental_health(vectors, labels):
-    positive = {"happy", "calm", "neutral", "surprise"}
-    negative = {"sad", "angry", "fear", "fearful", "disgust"}
+    positive = {"happy", "neutral", "surprise"}
+    negative = {"sad", "angry", "fear", "disgust"}
 
     pos_scores, neg_scores = [], []
 
     for vec in vectors:
         for i, label in enumerate(labels):
-            lbl = label.lower()
-            if lbl in positive:
+            if label in positive:
                 pos_scores.append(vec[i])
-            elif lbl in negative:
+            elif label in negative:
                 neg_scores.append(vec[i])
 
     if not pos_scores:
@@ -140,16 +184,25 @@ def calculate_mental_health(vectors, labels):
 
     mhi = np.mean(pos_scores) - np.mean(neg_scores)
 
-    if mhi > 0.25:
+    if mhi > 0.20:
         status = "Mentally Stable 😊"
     elif mhi > 0:
         status = "Mild Stress 😐"
-    elif mhi > -0.25:
+    elif mhi > -0.20:
         status = "Elevated Stress 😟"
     else:
         status = "High Stress Risk ⚠️"
 
     return status, round(mhi, 3)
+
+# =========================================
+# COMBINED HISTORY (ORDER-INDEPENDENT)
+# =========================================
+def get_combined_emotion_history():
+    combined = []
+    for modality in ["text", "image", "audio"]:
+        combined.extend(emotion_history[modality])
+    return combined
 
 # =========================================
 # MAIN ROUTE
@@ -176,8 +229,8 @@ def index():
                 training=False
             )
 
-            probabilities = outputs["classifier"].numpy()[0]
-            labels = TEXT_EMOTIONS
+            raw_probs = outputs["classifier"].numpy()[0]
+            probabilities = align_text_probabilities(raw_probs, TEXT_EMOTIONS)
 
         # -------- IMAGE --------
         elif mode == "image":
@@ -197,8 +250,8 @@ def index():
             img_array = image.img_to_array(img)
             img_array = np.expand_dims(img_array, axis=0) / 255.0
 
-            probabilities = image_model.predict(img_array)[0]
-            labels = IMAGE_CLASSES
+            raw_probs = image_model.predict(img_array)[0]
+            probabilities = align_image_probabilities(raw_probs, IMAGE_CLASSES)
 
         # -------- AUDIO --------
         elif mode == "audio":
@@ -225,29 +278,31 @@ def index():
                 dtype="float32"
             )
 
-            probabilities = audio_model.predict(feature_padded)[0]
-            labels = OBSERVED_EMOTIONS
+            raw_probs = audio_model.predict(feature_padded)[0]
+            probabilities = align_audio_probabilities(raw_probs)
 
         else:
             return render_template("index.html")
 
         # -------- FINAL OUTPUT --------
         idx = np.argmax(probabilities)
-        prediction = labels[idx]
+        prediction = FINAL_EMOTIONS[idx]
         confidence = f"{probabilities[idx] * 100:.2f}%"
 
-        # store per modality (FIX)
+        # store modality history
         emotion_history[mode].append(probabilities.tolist())
         if len(emotion_history[mode]) > MAX_HISTORY:
             emotion_history[mode].pop(0)
 
-        if len(emotion_history[mode]) >= 2:
+        # 🔥 COMBINED MENTAL STATE (ORDER-INDEPENDENT)
+        combined_history = get_combined_emotion_history()
+        if len(combined_history) >= 2:
             mental_health, mh_score = calculate_mental_health(
-                emotion_history[mode],
-                labels
+                combined_history,
+                FINAL_EMOTIONS
             )
 
-        plot_probabilities(labels, probabilities)
+        plot_probabilities(FINAL_EMOTIONS, probabilities)
         plot_url = "/static/plots/emotion_plot.png"
 
     return render_template(
