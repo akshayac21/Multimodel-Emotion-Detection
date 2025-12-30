@@ -1,79 +1,151 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
     
-    // Elements
-    const modeSelect = document.getElementById('modeSelect');
-    const textGroup = document.getElementById('textInputParams');
-    const fileGroup = document.getElementById('fileInputParams');
-    const fileInput = document.getElementById('file');
-    const fileNameDisplay = document.getElementById('fileName');
-    const form = document.getElementById('analysisForm');
-    const submitBtn = document.getElementById('submitBtn');
-    const loadingOverlay = document.getElementById('loadingOverlay');
+    // --- 1. Element Selectors ---
+    const modeSelector = document.getElementById("mode-selector");
+    const inputTextGroup = document.getElementById("input-text");
+    const inputFileGroup = document.getElementById("input-file");
+    const textArea = document.querySelector('textarea[name="text"]');
+    const fileUpload = document.getElementById("file-upload");
+    const dropZone = document.getElementById("drop-zone");
+    
+    // Previews
+    const previewContainer = document.getElementById("preview-container");
+    const imagePreview = document.getElementById("image-preview");
+    const audioPreview = document.getElementById("audio-preview");
+    const filenameDisplay = document.getElementById("filename-display");
+    
+    // Form & UI
+    const form = document.getElementById("analysisForm");
+    const loader = document.getElementById("loader");
+    const submitBtn = document.getElementById("submit-btn");
 
-    // 1. Handle Mode Switching
-    function updateInputVisibility() {
-        const mode = modeSelect.value;
-        
-        // Reset required attributes to prevent browser validation errors on hidden fields
-        const textArea = document.getElementById('text');
-        
+    // --- 2. Tab / Mode Switching ---
+    window.switchMode = function(mode) {
+        // Update the hidden Flask select element
+        modeSelector.value = mode;
+
+        // Update Tab styling
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        const activeTab = document.querySelector(`.tab[data-mode="${mode}"]`);
+        if (activeTab) activeTab.classList.add('active');
+
+        // Toggle Input Visibility
         if (mode === 'text') {
-            textGroup.classList.remove('hidden');
-            fileGroup.classList.add('hidden');
-            textArea.required = true;
-            fileInput.required = false;
+            inputTextGroup.classList.remove('hidden');
+            inputFileGroup.classList.add('hidden');
+            fileUpload.required = false; 
         } else {
-            // Both Image and Audio use the file input
-            textGroup.classList.add('hidden');
-            fileGroup.classList.remove('hidden');
-            textArea.required = false;
-            fileInput.required = true;
-            
-            // Update accept attribute based on mode
+            inputTextGroup.classList.add('hidden');
+            inputFileGroup.classList.remove('hidden');
+            fileUpload.required = true; 
+
+            // Set file type filters
             if (mode === 'image') {
-                fileInput.accept = "image/*";
-                fileNameDisplay.textContent = "Upload Facial Image (JPG, PNG)";
-            } else {
-                fileInput.accept = "audio/*";
-                fileNameDisplay.textContent = "Upload Voice Recording (WAV, MP3)";
+                fileUpload.setAttribute('accept', 'image/*');
+                document.getElementById('file-label').innerText = "Upload Facial Image";
+            } else if (mode === 'audio') {
+                fileUpload.setAttribute('accept', 'audio/*');
+                document.getElementById('file-label').innerText = "Upload Voice Recording";
             }
         }
+        
+        clearPreviews();
+    };
+
+    // --- 3. File Handling & Previews ---
+    function clearPreviews() {
+        previewContainer.classList.add('hidden');
+        imagePreview.classList.add('hidden');
+        audioPreview.classList.add('hidden');
+        imagePreview.src = "";
+        audioPreview.src = "";
+        fileUpload.value = ""; 
+        filenameDisplay.innerText = "";
     }
 
-    // Initialize state
-    modeSelect.addEventListener('change', updateInputVisibility);
-    updateInputVisibility(); // Run on load
+    fileUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    // 2. Enhance File Input UX
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            fileNameDisplay.textContent = `Selected: ${e.target.files[0].name}`;
-            fileNameDisplay.style.color = '#0F766E'; // Teal color indicating success
-            fileNameDisplay.style.fontWeight = '600';
-        }
+        filenameDisplay.innerText = file.name;
+        previewContainer.classList.remove('hidden');
+
+        const mode = modeSelector.value;
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            if (mode === 'image') {
+                imagePreview.src = e.target.result;
+                imagePreview.classList.remove('hidden');
+                audioPreview.classList.add('hidden');
+            } else if (mode === 'audio') {
+                audioPreview.src = e.target.result;
+                audioPreview.classList.remove('hidden');
+                imagePreview.classList.add('hidden');
+            }
+        };
+        reader.readAsDataURL(file);
     });
 
-    // 3. Handle Form Submission & Loading
-    form.addEventListener('submit', (e) => {
-        // Basic Client-side Validation
-        const mode = modeSelect.value;
-        let isValid = true;
+    // --- 4. Drag and Drop ---
+    if (dropZone) {
+        dropZone.addEventListener("click", () => fileUpload.click());
 
-        if (mode === 'text' && !document.getElementById('text').value.trim()) {
-            isValid = false;
-            alert("Please enter text for analysis.");
-        } else if (mode !== 'text' && fileInput.files.length === 0) {
-            isValid = false;
-            alert("Please select a file.");
-        }
+        ["dragenter", "dragover"].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = "var(--primary)";
+                dropZone.style.background = "#f0f4f5";
+            }, false);
+        });
 
-        if (isValid) {
-            // Show Loader
-            loadingOverlay.classList.remove('hidden');
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = 'Analyzing...';
+        ["dragleave", "drop"].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = "var(--border)";
+                dropZone.style.background = "#fafbfc";
+            }, false);
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                fileUpload.files = files;
+                const event = new Event('change');
+                fileUpload.dispatchEvent(event);
+            }
+        });
+    }
+
+    // --- 5. Form Submission & Error Prevention ---
+    form.addEventListener("submit", (e) => {
+        const currentMode = modeSelector.value;
+
+        // Validation to prevent the "NoneType" error in Flask
+        if (currentMode === 'text') {
+            if (!textArea.value.trim()) {
+                e.preventDefault();
+                alert("Please enter a text statement for analysis.");
+                return;
+            }
         } else {
-            e.preventDefault(); // Stop submission if invalid
+            if (!fileUpload.files || fileUpload.files.length === 0) {
+                e.preventDefault();
+                alert(`Please upload an ${currentMode} file to proceed.`);
+                return;
+            }
         }
+
+        // Final safety check: if text is empty in Image/Audio mode,
+        // send a single space " " instead of nothing to prevent Backend iteration errors.
+        if (!textArea.value) {
+            textArea.value = " ";
+        }
+
+        // Visual feedback
+        loader.classList.remove("hidden");
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span>Processing...</span> <i class="fa-solid fa-circle-notch fa-spin"></i>`;
     });
 });
