@@ -3,105 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multimodal Emotion & Mental Health Analysis</title>
+    <title>Multimodal Emotion & Mental State Analyzer</title>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
-    <main class="app-container">
-        <header class="app-header">
+    <header class="hero-section">
+        <div class="hero-content">
             <div class="logo-area">
-                <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <h1>MindSense Analytics</h1>
+                <i class="fa-solid fa-brain"></i>
+                <span>NeuroSense AI</span>
             </div>
-            <p class="subtitle">Clinical-grade Multimodal Emotion Recognition & Mental Health Assessment</p>
-        </header>
+            <h1>Multimodal Emotion & <br>Mental State Analyzer</h1>
+            <p>Advanced AI-driven diagnostics using Text, Speech, and Visual cues to assess emotional well-being with medical-grade precision.</p>
+            
+            {% if not prediction %}
+            <button onclick="scrollToAnalysis()" class="cta-button">
+                Start Analysis <i class="fa-solid fa-arrow-right"></i>
+            </button>
+            {% else %}
+            <button onclick="scrollToResults()" class="cta-button">
+                View Results <i class="fa-solid fa-chart-pie"></i>
+            </button>
+            {% endif %}
+        </div>
+        <div class="hero-visual">
+            <div class="pulse-circle"></div>
+        </div>
+    </header>
 
-        <section class="card input-card">
+    <main class="container">
+        
+        <section id="analysis-section" class="card input-card {% if prediction %}compact-mode{% endif %}">
+            <div class="card-header">
+                <h2><i class="fa-solid fa-sliders"></i> Input Parameters</h2>
+                <p>Select a modality to begin analysis.</p>
+            </div>
+
             <form action="/" method="POST" enctype="multipart/form-data" id="analysisForm">
                 
-                <div class="form-group">
-                    <label for="mode">Select Input Modality</label>
-                    <div class="select-wrapper">
-                        <select name="mode" id="modeSelect">
-                            <option value="text">Text Analysis</option>
-                            <option value="image">Facial Expression (Image)</option>
-                            <option value="audio">Voice Tone (Audio)</option>
-                        </select>
+                <div class="tabs">
+                    <div class="tab active" data-mode="text" onclick="switchMode('text')">
+                        <i class="fa-solid fa-align-left"></i> Text Analysis
+                    </div>
+                    <div class="tab" data-mode="image" onclick="switchMode('image')">
+                        <i class="fa-solid fa-image"></i> Facial (Image)
+                    </div>
+                    <div class="tab" data-mode="audio" onclick="switchMode('audio')">
+                        <i class="fa-solid fa-microphone"></i> Vocal (Audio)
                     </div>
                 </div>
 
-                <div class="input-area">
-                    <div id="textInputParams" class="input-group">
-                        <label for="text">Patient Transcript / Notes</label>
-                        <textarea name="text" id="text" placeholder="Enter text here for analysis..."></textarea>
+                <select name="mode" id="mode-selector" style="display:none;">
+                    <option value="text" selected>text</option>
+                    <option value="image">image</option>
+                    <option value="audio">audio</option>
+                </select>
+
+                <div id="input-text" class="input-group">
+                    <label>Patient/User Statement</label>
+                    <textarea name="text" placeholder="Enter text here for sentiment and mental state analysis... (e.g., 'I feel overwhelming anxiety lately.')"></textarea>
+                </div>
+
+                <div id="input-file" class="input-group hidden">
+                    <label id="file-label">Upload Data</label>
+                    
+                    <div class="drop-zone" id="drop-zone">
+                        <span class="drop-zone__prompt">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> <br>
+                            Drag & Drop or Click to Upload
+                        </span>
+                        <input type="file" name="file" class="drop-zone__input" id="file-upload">
                     </div>
 
-                    <div id="fileInputParams" class="input-group hidden">
-                        <label for="file">Upload Media File</label>
-                        <div class="file-drop-zone">
-                            <input type="file" name="file" id="file">
-                            <div class="file-instruction">
-                                <span class="upload-icon">📁</span>
-                                <span id="fileName">Click to upload or drag file here</span>
-                            </div>
-                        </div>
+                    <div id="preview-container" class="hidden">
+                        <p class="preview-label">File Ready:</p>
+                        <img id="image-preview" src="" alt="Image Preview" class="hidden">
+                        <audio id="audio-preview" controls class="hidden"></audio>
+                        <p id="filename-display"></p>
                     </div>
                 </div>
 
-                <button type="submit" class="btn-primary" id="submitBtn">
-                    <span>Run Analysis</span>
-                </button>
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn" id="submit-btn">
+                        <span class="btn-text">Analyze Data</span>
+                        <i class="fa-solid fa-microchip"></i>
+                    </button>
+                </div>
+
             </form>
+
+            <div id="loader" class="loader-overlay hidden">
+                <div class="spinner"></div>
+                <p>Processing Neural Models...</p>
+            </div>
         </section>
 
-        <div id="loadingOverlay" class="hidden">
-            <div class="spinner"></div>
-            <p>Processing Data...</p>
-        </div>
-
         {% if prediction %}
-        <section class="results-container">
+        <section id="results-section" class="results-grid">
             
-            <div class="metrics-grid">
-                <div class="card metric-card">
-                    <span class="label">Primary Emotion</span>
-                    <h2 class="value-large text-primary">{{ prediction }}</h2>
-                    <div class="confidence-tag">
-                        Confidence: <strong>{{ confidence }}%</strong>
+            <div class="card result-card highlight-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-stethoscope"></i> Diagnostic Result</h3>
+                </div>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Predicted Emotion</span>
+                        <span class="stat-value text-primary">{{ prediction }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Model Confidence</span>
+                        <span class="stat-value">{{ confidence }}</span>
                     </div>
                 </div>
 
-                <div class="card metric-card mh-card" data-status="{{ mental_health }}">
-                    <span class="label">Mental Health Assessment</span>
-                    <h2 class="value-large">{{ mental_health }}</h2>
-                    
-                   {% set safe_score = mh_score if mh_score is not none else 0 %}
+                {% if mental_health %}
+                <div class="mh-box">
+                    <div class="mh-header">
+                        <span>Mental Health Indication</span>
+                        <span class="badge 
+                            {% if mh_score > 0.25 %}badge-success
+                            {% elif mh_score < -0.25 %}badge-danger
+                            {% else %}badge-warning{% endif %}">
+                            {{ mental_health }}
+                        </span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: {{ (mh_score + 1) * 50 }}%;"></div>
+                    </div>
+                    <small>Mental Health Index: {{ mh_score }}</small>
+                </div>
+                {% else %}
+                <div class="mh-info-note">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <p>Mental State calculation requires at least <strong>two</strong> inputs to analyze emotional trends.</p>
+                </div>
+                {% endif %}
+            </div>
 
-                    <div class="score-bar">
-                        <span class="score-label">Risk Score: {{ safe_score }}</span>
-                        <div class="progress-bg">
-                            <div class="progress-fill" style="width: {{ safe_score * 10 if safe_score < 10 else safe_score }}%;"></div>
+            <div class="card result-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-chart-column"></i> Probability Distribution</h3>
+                </div>
+                <div class="plot-container">
+                    {% if plot %}
+                    <img src="{{ plot }}?v={{ range(1, 1000) | random }}" alt="Emotion Probability Graph" class="plot-image">
+                    {% else %}
+                    <p class="no-data">No visualization data available.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card result-card input-recap">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Analysis Context</h3>
+                </div>
+                <div class="recap-content">
+                    {% if request.form.get('mode') == 'text' %}
+                        <div class="text-read-only">
+                            "{{ request.form.get('text') }}"
                         </div>
-                    </div>
+                    {% elif request.form.get('mode') == 'image' %}
+                        <div class="file-recap">
+                            <i class="fa-solid fa-image"></i>
+                            <span>Image Analysis Performed</span>
+                            <small>Visual features extracted from uploaded file.</small>
+                        </div>
+                    {% elif request.form.get('mode') == 'audio' %}
+                        <div class="file-recap">
+                            <i class="fa-solid fa-wave-square"></i>
+                            <span>Audio Analysis Performed</span>
+                            <small>Tonal features extracted from uploaded file.</small>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
-
-            {% if plot %}
-            <div class="card chart-card">
-                <h3>Probability Distribution</h3>
-                <div class="chart-wrapper">
-                    <img src="{{ plot }}" alt="Emotion Probability Graph" class="analysis-plot">
-                </div>
-            </div>
-            {% endif %}
 
         </section>
         {% endif %}
@@ -109,5 +189,18 @@
     </main>
 
     <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+    <script>
+        // Scroll logic for better navigation
+        function scrollToAnalysis() {
+            document.getElementById('analysis-section').scrollIntoView({ behavior: 'smooth' });
+        }
+        function scrollToResults() {
+            document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        {% if prediction %}
+            document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+        {% endif %}
+    </script>
 </body>
 </html>
