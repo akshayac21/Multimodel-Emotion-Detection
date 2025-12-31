@@ -20,109 +20,99 @@ document.addEventListener("DOMContentLoaded", () => {
     const submitBtn = document.getElementById("submit-btn");
 
     // --- 2. Tab / Mode Switching ---
+    // This function is called by the onclick attributes in index.html
     window.switchMode = function(mode) {
-        // Update the hidden Flask select element
+        // Update the hidden input that Flask reads
         modeSelector.value = mode;
 
-        // Update Tab styling
+        // Update Tab UI Styling
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         const activeTab = document.querySelector(`.tab[data-mode="${mode}"]`);
         if (activeTab) activeTab.classList.add('active');
 
         // Toggle Input Visibility
         if (mode === 'text') {
-            inputTextGroup.classList.remove('hidden');
-            inputFileGroup.classList.add('hidden');
-            fileUpload.required = false; 
+            inputTextGroup.classList.remove("hidden");
+            inputFileGroup.classList.add("hidden");
         } else {
-            inputTextGroup.classList.add('hidden');
-            inputFileGroup.classList.remove('hidden');
-            fileUpload.required = true; 
-
-            // Set file type filters
-            if (mode === 'image') {
-                fileUpload.setAttribute('accept', 'image/*');
-                document.getElementById('file-label').innerText = "Upload Facial Image";
-            } else if (mode === 'audio') {
-                fileUpload.setAttribute('accept', 'audio/*');
-                document.getElementById('file-label').innerText = "Upload Voice Recording";
+            inputTextGroup.classList.add("hidden");
+            inputFileGroup.classList.remove("hidden");
+            
+            // Update the text label inside the upload box based on mode
+            const label = document.getElementById("file-label");
+            if (label) {
+                label.innerText = mode === 'image' ? "Upload Facial Expression (Image)" : "Upload Vocal Recording (Audio)";
             }
+            
+            // Dynamically update accepted file types
+            fileUpload.setAttribute('accept', mode === 'image' ? 'image/*' : 'audio/*');
         }
-        
-        clearPreviews();
-    };
-
-    // --- 3. File Handling & Previews ---
-    function clearPreviews() {
-        previewContainer.classList.add('hidden');
-        imagePreview.classList.add('hidden');
-        audioPreview.classList.add('hidden');
-        imagePreview.src = "";
-        audioPreview.src = "";
-        fileUpload.value = ""; 
-        filenameDisplay.innerText = "";
     }
 
-    fileUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    // --- 3. File Upload Trigger & Preview ---
+    // Make the entire drop zone clickable to trigger the hidden file input
+    if (dropZone) {
+        dropZone.addEventListener("click", () => {
+            fileUpload.click();
+        });
+    }
 
-        filenameDisplay.innerText = file.name;
-        previewContainer.classList.remove('hidden');
+    fileUpload.addEventListener("change", function() {
+        const file = this.files[0];
+        if (file) {
+            previewContainer.classList.remove("hidden");
+            filenameDisplay.innerText = `Selected: ${file.name}`;
 
-        const mode = modeSelector.value;
-        const reader = new FileReader();
-
-        reader.onload = function(e) {
-            if (mode === 'image') {
-                imagePreview.src = e.target.result;
-                imagePreview.classList.remove('hidden');
-                audioPreview.classList.add('hidden');
-            } else if (mode === 'audio') {
-                audioPreview.src = e.target.result;
-                audioPreview.classList.remove('hidden');
-                imagePreview.classList.add('hidden');
+            const reader = new FileReader();
+            
+            // Handle Image Preview
+            if (modeSelector.value === 'image' && file.type.startsWith("image/")) {
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreview.classList.remove("hidden");
+                    audioPreview.classList.add("hidden");
+                };
+                reader.readAsDataURL(file);
+            } 
+            // Handle Audio Preview
+            else if (modeSelector.value === 'audio' && file.type.startsWith("audio/")) {
+                const url = URL.createObjectURL(file);
+                audioPreview.src = url;
+                audioPreview.classList.remove("hidden");
+                imagePreview.classList.add("hidden");
             }
-        };
-        reader.readAsDataURL(file);
+        }
     });
 
-    // --- 4. Drag and Drop ---
+    // --- 4. Drag and Drop Support ---
     if (dropZone) {
-        dropZone.addEventListener("click", () => fileUpload.click());
-
-        ["dragenter", "dragover"].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
+        ["dragover", "dragleave", "drop"].forEach(evt => {
+            dropZone.addEventListener(evt, (e) => {
                 e.preventDefault();
-                dropZone.style.borderColor = "var(--primary)";
-                dropZone.style.background = "#f0f4f5";
-            }, false);
+                e.stopPropagation();
+            });
         });
 
-        ["dragleave", "drop"].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropZone.style.borderColor = "var(--border)";
-                dropZone.style.background = "#fafbfc";
-            }, false);
-        });
-
+        dropZone.addEventListener("dragover", () => dropZone.classList.add("drop-zone--over"));
+        dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drop-zone--over"));
+        
         dropZone.addEventListener("drop", (e) => {
-            const dt = e.dataTransfer;
-            const files = dt.files;
+            dropZone.classList.remove("drop-zone--over");
+            const files = e.dataTransfer.files;
             if (files.length) {
                 fileUpload.files = files;
+                // Trigger the 'change' event manually so the preview logic runs
                 const event = new Event('change');
                 fileUpload.dispatchEvent(event);
             }
         });
     }
 
-    // --- 5. Form Submission & Error Prevention ---
+    // --- 5. Form Submission & Validation ---
     form.addEventListener("submit", (e) => {
         const currentMode = modeSelector.value;
 
-        // Validation to prevent the "NoneType" error in Flask
+        // Validation: Prevent submitting without required data
         if (currentMode === 'text') {
             if (!textArea.value.trim()) {
                 e.preventDefault();
@@ -137,15 +127,22 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        // Final safety check: if text is empty in Image/Audio mode,
-        // send a single space " " instead of nothing to prevent Backend iteration errors.
+        // Backend Safety: Ensure 'text' field is never null for Image/Audio modes
         if (!textArea.value) {
             textArea.value = " ";
         }
 
-        // Visual feedback
+        // Show Loading UI
         loader.classList.remove("hidden");
         submitBtn.disabled = true;
-        submitBtn.innerHTML = `<span>Processing...</span> <i class="fa-solid fa-circle-notch fa-spin"></i>`;
+        
+        // Give the user feedback that AI is working
+        submitBtn.innerHTML = `
+            <span>AI is Analyzing...</span> 
+            <i class="fa-solid fa-wand-magic-sparkles fa-beat" style="margin-left:8px;"></i>
+        `;
+
+        // Auto-scroll to loader for better mobile UX
+        loader.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 });
