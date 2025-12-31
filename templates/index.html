@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multimodal Emotion & Mental State Analyzer</title>
+    <title>NeuroSense AI | Multimodal Mental Health Analyzer</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -27,7 +27,7 @@
             </button>
             {% else %}
             <button onclick="scrollToResults()" class="cta-button">
-                View Results <i class="fa-solid fa-chart-pie"></i>
+                View Results <i class="fa-solid fa-chart-column"></i>
             </button>
             {% endif %}
         </div>
@@ -58,15 +58,11 @@
                     </div>
                 </div>
 
-                <select name="mode" id="mode-selector" style="display:none;">
-                    <option value="text" selected>text</option>
-                    <option value="image">image</option>
-                    <option value="audio">audio</option>
-                </select>
+                <input type="hidden" name="mode" id="mode-selector" value="text">
 
                 <div id="input-text" class="input-group">
                     <label>Patient/User Statement</label>
-                    <textarea name="text" placeholder="Enter text here for sentiment and mental state analysis... (e.g., 'I feel overwhelming anxiety lately.')"></textarea>
+                    <textarea name="text" placeholder="Enter text here... (e.g., 'I have been feeling quite stressed lately.')"></textarea>
                 </div>
 
                 <div id="input-file" class="input-group hidden">
@@ -75,13 +71,13 @@
                     <div class="drop-zone" id="drop-zone">
                         <span class="drop-zone__prompt">
                             <i class="fa-solid fa-cloud-arrow-up"></i> <br>
-                            Drag & Drop or Click to Upload
+                            Click to Upload or Drag & Drop File
                         </span>
                         <input type="file" name="file" class="drop-zone__input" id="file-upload">
                     </div>
 
                     <div id="preview-container" class="hidden">
-                        <p class="preview-label">File Ready:</p>
+                        <p class="preview-label">File Preview:</p>
                         <img id="image-preview" src="" alt="Image Preview" class="hidden">
                         <audio id="audio-preview" controls class="hidden"></audio>
                         <p id="filename-display"></p>
@@ -99,7 +95,7 @@
 
             <div id="loader" class="loader-overlay hidden">
                 <div class="spinner"></div>
-                <p>Processing Neural Models...</p>
+                <p>AI is Analyzing Neural Models...</p>
             </div>
         </section>
 
@@ -126,8 +122,8 @@
                     <div class="mh-header">
                         <span>Mental Health Indication</span>
                         <span class="badge 
-                            {% if mh_score > 0.25 %}badge-success
-                            {% elif mh_score < -0.25 %}badge-danger
+                            {% if mh_score > 0.20 %}badge-success
+                            {% elif mh_score < -0.20 %}badge-danger
                             {% else %}badge-warning{% endif %}">
                             {{ mental_health }}
                         </span>
@@ -135,12 +131,12 @@
                     <div class="progress-bar-bg">
                         <div class="progress-bar-fill" style="width: {{ (mh_score + 1) * 50 }}%;"></div>
                     </div>
-                    <small>Mental Health Index: {{ mh_score }}</small>
+                    <small>Mental Health Index Score: {{ mh_score }}</small>
                 </div>
                 {% else %}
                 <div class="mh-info-note">
                     <i class="fa-solid fa-circle-info"></i>
-                    <p>Mental State calculation requires at least <strong>two</strong> inputs to analyze emotional trends.</p>
+                    <p>Mental State Index requires <strong>two</strong> inputs to analyze emotional trends.</p>
                 </div>
                 {% endif %}
             </div>
@@ -151,33 +147,23 @@
                 </div>
                 <div class="plot-container">
                     {% if plot %}
-                    <img src="{{ plot }}?v={{ range(1, 1000) | random }}" alt="Emotion Probability Graph" class="plot-image">
+                    <img src="{{ plot }}?v={{ range(1, 1000) | random }}" alt="Emotion Probabilities" class="plot-image">
                     {% else %}
-                    <p class="no-data">No visualization data available.</p>
+                    <p class="no-data">Visualization data unavailable.</p>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="card result-card input-recap">
+            <div class="card result-card highlight-card ai-insight-card">
                 <div class="card-header">
-                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Analysis Context</h3>
+                    <h3><i class="fa-solid fa-wand-magic-sparkles"></i> AI Wellness Insights</h3>
                 </div>
-                <div class="recap-content">
-                    {% if request.form.get('mode') == 'text' %}
-                        <div class="text-read-only">
-                            "{{ request.form.get('text') }}"
-                        </div>
-                    {% elif request.form.get('mode') == 'image' %}
-                        <div class="file-recap">
-                            <i class="fa-solid fa-image"></i>
-                            <span>Image Analysis Performed</span>
-                            <small>Visual features extracted from uploaded file.</small>
-                        </div>
-                    {% elif request.form.get('mode') == 'audio' %}
-                        <div class="file-recap">
-                            <i class="fa-solid fa-wave-square"></i>
-                            <span>Audio Analysis Performed</span>
-                            <small>Tonal features extracted from uploaded file.</small>
+                <div class="suggestion-content">
+                    {% if ai_suggestions %}
+                        {{ ai_suggestions | replace('\n', '<br>') | safe }}
+                    {% else %}
+                        <div class="mh-info-note" style="background: transparent; border: none; padding: 0;">
+                            <p><em>Personalized suggestions will appear here once your emotional history contains 2 or more entries.</em></p>
                         </div>
                     {% endif %}
                 </div>
@@ -190,16 +176,18 @@
 
     <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
     <script>
-        // Scroll logic for better navigation
         function scrollToAnalysis() {
             document.getElementById('analysis-section').scrollIntoView({ behavior: 'smooth' });
         }
         function scrollToResults() {
-            document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+            const res = document.getElementById('results-section');
+            if(res) res.scrollIntoView({ behavior: 'smooth' });
         }
 
         {% if prediction %}
-            document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+            window.onload = function() {
+                setTimeout(scrollToResults, 300);
+            };
         {% endif %}
     </script>
 </body>
