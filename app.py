@@ -32,6 +32,11 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # =========================================
+# GEMINI IMPORT (NEW)
+# =========================================
+import google.generativeai as genai
+
+# =========================================
 # GLOBAL EMOTION SCHEMA (FINAL)
 # =========================================
 FINAL_EMOTIONS = [
@@ -113,12 +118,21 @@ MAX_SEQUENCE_LENGTH = 200
 audio_model = load_model(AUDIO_MODEL_PATH)
 
 # =========================================
+# GEMINI CONFIG (NEW)
+# =========================================
+genai.configure(api_key=os.getenv("--your--api--"))
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+
+print("GEMINI KEY FOUND:", bool(os.getenv("--your--api--")))
+
+
+# =========================================
 # FLASK APP
 # =========================================
 app = Flask(__name__)
 
 # =========================================
-# PLOT FUNCTION
+# PLOT FUNCTION (UNCHANGED)
 # =========================================
 def plot_probabilities(labels, probabilities):
     plt.figure(figsize=(9, 4))
@@ -132,7 +146,7 @@ def plot_probabilities(labels, probabilities):
     plt.close()
 
 # =========================================
-# ALIGNMENT FUNCTIONS
+# ALIGNMENT FUNCTIONS (UNCHANGED)
 # =========================================
 def align_text_probabilities(raw_probs, raw_labels):
     prob_map = dict(zip([l.lower() for l in raw_labels], raw_probs))
@@ -140,16 +154,12 @@ def align_text_probabilities(raw_probs, raw_labels):
     return probs / np.sum(probs)
 
 def align_image_probabilities(raw_probs, raw_labels):
-    prob_map = {
-        lbl.lower(): raw_probs[i]
-        for i, lbl in enumerate(raw_labels)
-    }
+    prob_map = {lbl.lower(): raw_probs[i] for i, lbl in enumerate(raw_labels)}
     probs = np.array([prob_map.get(e, 0.0) for e in FINAL_EMOTIONS])
     return probs / np.sum(probs)
 
 def align_audio_probabilities(raw_probs):
     audio_map = dict(zip(AUDIO_ORIGINAL_LABELS, raw_probs))
-
     final_map = {
         "angry": audio_map.get("angry", 0.0),
         "sad": audio_map.get("sad", 0.0),
@@ -159,12 +169,11 @@ def align_audio_probabilities(raw_probs):
         "fear": audio_map.get("fearful", 0.0),
         "disgust": 0.0
     }
-
     probs = np.array([final_map[e] for e in FINAL_EMOTIONS])
     return probs / np.sum(probs)
 
 # =========================================
-# MENTAL HEALTH CALCULATION
+# MENTAL HEALTH CALCULATION (UNCHANGED)
 # =========================================
 def calculate_mental_health(vectors, labels):
     positive = {"happy", "neutral", "surprise"}
@@ -196,13 +205,41 @@ def calculate_mental_health(vectors, labels):
     return status, round(mhi, 3)
 
 # =========================================
-# COMBINED HISTORY (ORDER-INDEPENDENT)
+# COMBINED HISTORY (UNCHANGED)
 # =========================================
 def get_combined_emotion_history():
     combined = []
     for modality in ["text", "image", "audio"]:
         combined.extend(emotion_history[modality])
     return combined
+
+# =========================================
+# GEMINI SUGGESTIONS (NEW)
+# =========================================
+def generate_ai_suggestions(mental_state, mh_score):
+    prompt = f"""
+You are a mental wellness assistant.
+
+User mental state:
+- Status: {mental_state}
+- Score: {mh_score}
+
+Provide 3–5 short, supportive, non-clinical suggestions.
+Do NOT diagnose.
+Do NOT mention AI or analysis.
+Use bullet points only.
+"""
+
+    try:
+        response = gemini_model.generate_content(prompt)
+        return response.text.strip()
+    except Exception:
+        return (
+            "• Take a few deep breaths\n"
+            "• Stay hydrated\n"
+            "• Step away from screens briefly\n"
+            "• Reach out to someone you trust"
+        )
 
 # =========================================
 # MAIN ROUTE
@@ -214,51 +251,31 @@ def index():
     plot_url = None
     mental_health = None
     mh_score = None
+    ai_suggestions = None   # NEW
 
     if request.method == "POST":
         mode = request.form.get("mode")
 
-        # -------- TEXT --------
         if mode == "text":
             text_input = request.form.get("text", "").strip()
-            if not text_input:
-                return render_template("index.html")
-
-            outputs = text_model(
-                np.array([text_input], dtype=str),
-                training=False
+            outputs = text_model(np.array([text_input], dtype=str), training=False)
+            probabilities = align_text_probabilities(
+                outputs["classifier"].numpy()[0], TEXT_EMOTIONS
             )
 
-            raw_probs = outputs["classifier"].numpy()[0]
-            probabilities = align_text_probabilities(raw_probs, TEXT_EMOTIONS)
-
-        # -------- IMAGE --------
         elif mode == "image":
             file = request.files.get("file")
-            if not file or file.filename == "":
-                return render_template("index.html")
-
             file_path = os.path.join(UPLOAD_FOLDER, file.filename)
             file.save(file_path)
 
-            img = image.load_img(
-                file_path,
-                target_size=IMG_SIZE,
-                color_mode="rgb"
+            img = image.load_img(file_path, target_size=IMG_SIZE)
+            img_array = np.expand_dims(image.img_to_array(img) / 255.0, axis=0)
+            probabilities = align_image_probabilities(
+                image_model.predict(img_array)[0], IMAGE_CLASSES
             )
 
-            img_array = image.img_to_array(img)
-            img_array = np.expand_dims(img_array, axis=0) / 255.0
-
-            raw_probs = image_model.predict(img_array)[0]
-            probabilities = align_image_probabilities(raw_probs, IMAGE_CLASSES)
-
-        # -------- AUDIO --------
         elif mode == "audio":
             file = request.files.get("file")
-            if not file or file.filename == "":
-                return render_template("index.html")
-
             file_path = os.path.join(UPLOAD_FOLDER, file.filename)
             file.save(file_path)
 
@@ -269,38 +286,25 @@ def index():
                     X = np.mean(X, axis=1)
 
             mfccs = librosa.feature.mfcc(y=X, sr=sr, n_mfcc=40)
-            feature = mfccs.T
-
             feature_padded = pad_sequences(
-                [feature],
-                maxlen=MAX_SEQUENCE_LENGTH,
-                padding="post",
-                dtype="float32"
+                [mfccs.T], maxlen=MAX_SEQUENCE_LENGTH, padding="post"
+            )
+            probabilities = align_audio_probabilities(
+                audio_model.predict(feature_padded)[0]
             )
 
-            raw_probs = audio_model.predict(feature_padded)[0]
-            probabilities = align_audio_probabilities(raw_probs)
-
-        else:
-            return render_template("index.html")
-
-        # -------- FINAL OUTPUT --------
         idx = np.argmax(probabilities)
         prediction = FINAL_EMOTIONS[idx]
         confidence = f"{probabilities[idx] * 100:.2f}%"
 
-        # store modality history
         emotion_history[mode].append(probabilities.tolist())
         if len(emotion_history[mode]) > MAX_HISTORY:
             emotion_history[mode].pop(0)
 
-        # 🔥 COMBINED MENTAL STATE (ORDER-INDEPENDENT)
-        combined_history = get_combined_emotion_history()
-        if len(combined_history) >= 2:
-            mental_health, mh_score = calculate_mental_health(
-                combined_history,
-                FINAL_EMOTIONS
-            )
+        combined = get_combined_emotion_history()
+        if len(combined) >= 2:
+            mental_health, mh_score = calculate_mental_health(combined, FINAL_EMOTIONS)
+            ai_suggestions = generate_ai_suggestions(mental_health, mh_score)
 
         plot_probabilities(FINAL_EMOTIONS, probabilities)
         plot_url = "/static/plots/emotion_plot.png"
@@ -311,7 +315,8 @@ def index():
         confidence=confidence,
         plot=plot_url,
         mental_health=mental_health,
-        mh_score=mh_score
+        mh_score=mh_score,
+        ai_suggestions=ai_suggestions   # NEW
     )
 
 # =========================================
