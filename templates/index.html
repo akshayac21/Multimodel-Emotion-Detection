@@ -3,12 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroSense AI | Multimodal Mental Health Analyzer</title>
+    <title>Emo AI | Multimodal Mental Health Analyzer</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <style>
+        /* These styles force the separated cards to span the full width of the results grid, placing them on their own row below the top two cards. */
+        #mh-indication-card,
+        #probability-card {
+            grid-column: 1 / -1; /* Ensures it spans both columns */
+        }
+        /* Styling for the new card header */
+        #mh-indication-card .card-header { margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+    </style>
 </head>
 <body>
 
@@ -16,7 +26,7 @@
         <div class="hero-content">
             <div class="logo-area">
                 <i class="fa-solid fa-brain"></i>
-                <span>NeuroSense AI</span>
+                <span>Emo AI</span>
             </div>
             <h1>Multimodal Emotion & <br>Mental State Analyzer</h1>
             <p>Advanced AI-driven diagnostics using Text, Speech, and Visual cues to assess emotional well-being with medical-grade precision.</p>
@@ -102,7 +112,7 @@
         {% if prediction %}
         <section id="results-section" class="results-grid">
             
-            <div class="card result-card highlight-card">
+            <div id="diagnostic-card" class="card result-card highlight-card">
                 <div class="card-header">
                     <h3><i class="fa-solid fa-stethoscope"></i> Diagnostic Result</h3>
                 </div>
@@ -116,8 +126,32 @@
                         <span class="stat-value">{{ confidence }}</span>
                     </div>
                 </div>
+                </div>
 
+            <div id="ai-insights-card" class="card result-card highlight-card ai-insight-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-wand-magic-sparkles"></i> AI Wellness Insights</h3>
+                </div>
+                <div class="suggestion-content">
+                    {% if ai_suggestions %}
+                        {{ ai_suggestions | replace('\n', '<br>') | safe }}
+                    {% else %}
+                        <div class="mh-info-note" style="background: transparent; border: none; padding: 0;">
+                            <p><em>Personalized suggestions will appear here once your emotional history contains 2 or more entries.</em></p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div id="mh-indication-card" class="card result-card highlight-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-heart-pulse"></i> Mental Health Overview</h3>
+                </div>
                 {% if mental_health %}
+                {% set bar_color = '#27ae60' %} {# Default: Green for Stable/Low Stress #}
+                {% if mh_score < -0.20 %}
+                    {% set bar_color = '#e74c3c' %} {# Red for High Stress Risk #}
+                {% endif %}
                 <div class="mh-box">
                     <div class="mh-header">
                         <span>Mental Health Indication</span>
@@ -141,7 +175,7 @@
                 {% endif %}
             </div>
 
-            <div class="card result-card">
+            <div id="probability-card" class="card result-card">
                 <div class="card-header">
                     <h3><i class="fa-solid fa-chart-column"></i> Probability Distribution</h3>
                 </div>
@@ -150,21 +184,6 @@
                     <img src="{{ plot }}?v={{ range(1, 1000) | random }}" alt="Emotion Probabilities" class="plot-image">
                     {% else %}
                     <p class="no-data">Visualization data unavailable.</p>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="card result-card highlight-card ai-insight-card">
-                <div class="card-header">
-                    <h3><i class="fa-solid fa-wand-magic-sparkles"></i> AI Wellness Insights</h3>
-                </div>
-                <div class="suggestion-content">
-                    {% if ai_suggestions %}
-                        {{ ai_suggestions | replace('\n', '<br>') | safe }}
-                    {% else %}
-                        <div class="mh-info-note" style="background: transparent; border: none; padding: 0;">
-                            <p><em>Personalized suggestions will appear here once your emotional history contains 2 or more entries.</em></p>
-                        </div>
                     {% endif %}
                 </div>
             </div>
