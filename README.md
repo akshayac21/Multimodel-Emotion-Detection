@@ -264,15 +264,30 @@ http://127.0.0.1:5000
 
 ---
 
-## Screenshots
+## Screenshots Reference
 
-All application screenshots should be stored in the `screenshots/` directory and may include:
+The following screenshots demonstrate the complete application workflow:
 
-* Home page
-* Text analysis
-* Image analysis
-* Audio analysis
-* Results dashboard
+* Home page interface and application overview
+  `(screenshots/home.png)`
+
+* Facial emotion analysis image upload and preview interface
+  `(screenshots/image_input.png)`
+
+* Facial emotion analysis results 
+  `(screenshots/image_result.png)`
+
+* Speech emotion analysis audio upload and preview interface
+  `(screenshots/audio_input.png)`
+
+* Speech emotion analysis results 
+  `(screenshots/audio_result.png)`
+  
+* Text emotion analysis input interface
+  `(screenshots/text_input.png)`
+
+* Text emotion analysis results 
+  `(screenshots/text_result.png)`
 
 ---
 
