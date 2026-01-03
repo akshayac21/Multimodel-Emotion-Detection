@@ -208,12 +208,12 @@ textarea {
     font-weight: 600;
 }
 
-.progress-bar-bg {
-    background-color: #e9ecef;
-    height: 12px;
-    border-radius: 10px;
-    overflow: hidden;
-    margin: 10px 0;
+.progress-bar-bg { 
+    background-color: #e9ecef; 
+    height: 12px; 
+    border-radius: 10px; 
+    overflow: hidden; 
+    margin: 10px 0; 
 }
 
 .progress-bar-fill {
@@ -278,4 +278,143 @@ textarea {
 @media (max-width: 768px) {
     .results-grid { grid-template-columns: 1fr; }
     .hero-section h1 { font-size: 1.8rem; }
+}
+
+/* 1️⃣ HERO SECTION */
+.hero-section {
+    background: var(--primary);
+    color: white;
+    padding: 4rem 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: -3rem;
+    padding-bottom: 6rem;
+}
+
+/* INSERT HERE */
+
+.hero-visual {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 1; /* Behind content */
+    opacity: 0.15;
+}
+
+.pulse-circle {
+    position: absolute;
+    width: 350px;
+    height: 350px;
+    background: #ffffff; /* White circle */
+    border-radius: 50%;
+    top: 50%;
+    left: 85%; /* Position it off to the right */
+    transform: translate(-50%, -50%);
+    opacity: 0.2;
+    box-shadow: 0 0 50px #ffffff;
+    animation: pulse 4s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); opacity: 0.1; }
+    50% { transform: scale(1.05); opacity: 0.3; }
+    100% { transform: scale(0.95); opacity: 0.1; }
+}
+
+/* END INSERT */
+
+.hero-content {
+    max-width: 800px;
+    z-index: 2;
+}
+
+/* 8️⃣ FORM ELEMENTS & ACTIONS */
+
+.form-actions {
+    margin-top: 2rem;
+    text-align: center; /* Center the button within the card if needed */
+}
+
+.submit-btn {
+    /* Base styling inherited from CTA but adapted for form */
+    background: var(--primary); /* Deep Teal */
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 50px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px; /* Space between text and icon */
+    box-shadow: 0 4px 10px rgba(15, 76, 92, 0.3); /* Primary-colored shadow */
+}
+
+.submit-btn:hover {
+    background: var(--primary-light); /* Slightly lighter teal on hover */
+    transform: translateY(-1px);
+    box-shadow: 0 6px 15px rgba(15, 76, 92, 0.4);
+}
+
+.submit-btn:disabled {
+    background: #bdc3c7; /* Grey out when disabled (e.g., during analysis) */
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+/* File Preview Container and Elements */
+
+#preview-container {
+    /* Base style for the container that holds the preview */
+    margin-top: 1rem;
+    padding: 15px;
+    border: 1px solid var(--border); /* Use the defined border color */
+    border-radius: var(--radius); /* Use the defined border radius */
+    background: #f8f9fa; /* Light background for contrast */
+    text-align: center; /* Center content like the image and filename */
+}
+
+.preview-label {
+    /* Style for the "File Preview:" text */
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+#image-preview {
+    /* Style for the uploaded image element */
+    max-width: 100%;
+    height: auto;
+    max-height: 200px; /* Limits the image height to keep the form compact */
+    border-radius: 8px;
+    object-fit: contain; /* Ensures the whole image is visible */
+    margin: 10px auto; /* Center the image and add vertical margin */
+}
+
+#audio-preview {
+    /* Style for the audio player element */
+    width: 100%; /* Makes the player span the full width of the container */
+    margin-top: 10px;
+}
+
+#filename-display {
+    /* Style for the displayed file name */
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 10px;
+}#mh-indication-card .card-header {
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1rem;
 }
