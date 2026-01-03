@@ -32,9 +32,10 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # =========================================
-# GEMINI IMPORT (NEW)
+# GEMINI IMPORT (FIXED)
 # =========================================
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # =========================================
 # GLOBAL EMOTION SCHEMA (FINAL)
@@ -118,13 +119,11 @@ MAX_SEQUENCE_LENGTH = 200
 audio_model = load_model(AUDIO_MODEL_PATH)
 
 # =========================================
-# GEMINI CONFIG (NEW)
+# GEMINI CONFIG
 # =========================================
-genai.configure(api_key=os.getenv("--your--api--"))
+os.environ["GEMINI_API_KEY"] = "Provide your gemini api here"
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 gemini_model = genai.GenerativeModel("gemini-1.5-flash")
-
-print("GEMINI KEY FOUND:", bool(os.getenv("--your--api--")))
-
 
 # =========================================
 # FLASK APP
@@ -132,7 +131,7 @@ print("GEMINI KEY FOUND:", bool(os.getenv("--your--api--")))
 app = Flask(__name__)
 
 # =========================================
-# PLOT FUNCTION (UNCHANGED)
+# PLOT FUNCTION
 # =========================================
 def plot_probabilities(labels, probabilities):
     plt.figure(figsize=(9, 4))
@@ -146,7 +145,7 @@ def plot_probabilities(labels, probabilities):
     plt.close()
 
 # =========================================
-# ALIGNMENT FUNCTIONS (UNCHANGED)
+# ALIGNMENT FUNCTIONS
 # =========================================
 def align_text_probabilities(raw_probs, raw_labels):
     prob_map = dict(zip([l.lower() for l in raw_labels], raw_probs))
@@ -173,7 +172,7 @@ def align_audio_probabilities(raw_probs):
     return probs / np.sum(probs)
 
 # =========================================
-# MENTAL HEALTH CALCULATION (UNCHANGED)
+# MENTAL HEALTH CALCULATION
 # =========================================
 def calculate_mental_health(vectors, labels):
     positive = {"happy", "neutral", "surprise"}
@@ -205,41 +204,46 @@ def calculate_mental_health(vectors, labels):
     return status, round(mhi, 3)
 
 # =========================================
-# COMBINED HISTORY (UNCHANGED)
-# =========================================
-def get_combined_emotion_history():
-    combined = []
-    for modality in ["text", "image", "audio"]:
-        combined.extend(emotion_history[modality])
-    return combined
-
-# =========================================
-# GEMINI SUGGESTIONS (NEW)
+# GEMINI SUGGESTIONS (FIXED SAFETY)
 # =========================================
 def generate_ai_suggestions(mental_state, mh_score):
     prompt = f"""
-You are a mental wellness assistant.
+Act as a supportive wellness coach.(just for educational purpose)
+The user's mental state is: {mental_state} (Index Score: {mh_score}).
 
-User mental state:
-- Status: {mental_state}
-- Score: {mh_score}
-
-Provide 3–5 short, supportive, non-clinical suggestions.
-Do NOT diagnose.
-Do NOT mention AI or analysis.
-Use bullet points only.
+Provide 3-5 short, actionable, non-clinical wellness tips.
+Plain text only.
+One tip per line.
+No bullet points.
+No medical diagnosis.
 """
 
     try:
-        response = gemini_model.generate_content(prompt)
-        return response.text.strip()
-    except Exception:
-        return (
-            "• Take a few deep breaths\n"
-            "• Stay hydrated\n"
-            "• Step away from screens briefly\n"
-            "• Reach out to someone you trust"
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        }
+
+        response = gemini_model.generate_content(
+            prompt,
+            safety_settings=safety_settings
         )
+
+        if response.text:
+            return response.text.strip()
+
+    except Exception as e:
+        print("Gemini API Error:", e)
+
+    return (
+        "Take a few deep breaths\n"
+        "Stay hydrated\n"
+        "Step away from screens briefly\n"
+        "Reach out to someone you trust\n"
+        "(Api error occured)"
+    )
 
 # =========================================
 # MAIN ROUTE
@@ -251,7 +255,7 @@ def index():
     plot_url = None
     mental_health = None
     mh_score = None
-    ai_suggestions = None   # NEW
+    ai_suggestions = None
 
     if request.method == "POST":
         mode = request.form.get("mode")
@@ -301,7 +305,12 @@ def index():
         if len(emotion_history[mode]) > MAX_HISTORY:
             emotion_history[mode].pop(0)
 
-        combined = get_combined_emotion_history()
+        combined = (
+            emotion_history["text"]
+            + emotion_history["image"]
+            + emotion_history["audio"]
+        )
+
         if len(combined) >= 2:
             mental_health, mh_score = calculate_mental_health(combined, FINAL_EMOTIONS)
             ai_suggestions = generate_ai_suggestions(mental_health, mh_score)
@@ -316,7 +325,7 @@ def index():
         plot=plot_url,
         mental_health=mental_health,
         mh_score=mh_score,
-        ai_suggestions=ai_suggestions   # NEW
+        ai_suggestions=ai_suggestions
     )
 
 # =========================================
